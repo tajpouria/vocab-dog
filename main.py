@@ -1,11 +1,14 @@
 import os
 import sys
+from dotenv import load_dotenv
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
+
+load_dotenv()
 
 
-async def hello(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(f"Hello {update.effective_user.first_name}")
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    print(f"Received message: {update.message.text}")
 
 
 telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -17,6 +20,6 @@ if not telegram_token or not gemini_api_key:
 
 app = ApplicationBuilder().token(telegram_token).build()
 
-app.add_handler(CommandHandler("hello", hello))
+app.add_handler(MessageHandler(filters.TEXT, handle_message))
 
 app.run_polling()
