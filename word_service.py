@@ -40,29 +40,38 @@ MESSAGE_TEMPLATE = Template(
 
 {% endif -%}
 {% if synonyms -%}
-<b>Synonyms:</b> {{ synonyms | join(', ') }}
+<b>Synonyms:</b> 
+{% for synonym in synonyms -%}
+• {{ synonym }}{% if not loop.last %}, {% endif %}
+{% endfor %}
 
 {% endif -%}
 {% if antonyms -%}
-<b>Antonyms:</b> {{ antonyms | join(', ') }}
+<b>Antonyms:</b> 
+{% for antonym in antonyms -%}
+• {{ antonym }}{% if not loop.last %}, {% endif %}
+{% endfor %}
 
 {% endif -%}
 {% if examples -%}
 <b>Examples in Context:</b>
+
 {% for example in examples -%}
-{{ loop.index }}. <b>{{ example.context }}:</b> "{{ example.example }}"
-   <i>Translation:</i> {{ example.translation }}
-   {% if example.explanation -%}
-   <i>Note:</i> {{ example.explanation }}
-   {% endif %}
+<b>{{ loop.index }}. {{ example.context }}:</b>
+"{{ example.example }}"
+<i>Translation:</i> {{ example.translation }}
+{% if example.explanation -%}
+<i>Note:</i> {{ example.explanation }}
+{% endif %}
 
 {% endfor -%}
 {% endif -%}
 {% if collocations -%}
 <b>Common Collocations:</b>
+
 {% for collocation in collocations -%}
-• {{ collocation.phrase }} - <i>{{ collocation.meaning }}</i>
-{% endfor -%}
+• <b>{{ collocation.phrase }}</b> - <i>{{ collocation.meaning }}</i>
+{% endfor %}
 
 {% endif -%}
 {% if memory_tip -%}
