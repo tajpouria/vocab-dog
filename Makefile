@@ -1,5 +1,5 @@
 test:
-	pytest test_main.py -v
+	pytest
 
 typecheck:
 	mypy main.py
