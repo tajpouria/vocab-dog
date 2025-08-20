@@ -1,0 +1,92 @@
+---
+- name: Deploy Vocab Dog Bot to Production
+  hosts: production
+  become: yes
+  vars:
+    app_name: vocab-dog
+    app_dir: /opt/{{ app_name }}
+    service_name: "{{ app_name }}"
+    
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install Python3 and pip
+      apt:
+        name:
+          - python3
+          - python3-pip
+          - python3-venv
+          - python3-dev
+          - git
+        state: present
+
+    - name: Create application directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
+
+    - name: Copy application files
+      synchronize:
+        src: "{{ playbook_dir }}/../"
+        dest: "{{ app_dir }}/"
+        delete: yes
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=__pycache__"
+          - "--exclude=.pytest_cache"
+          - "--exclude=.mypy_cache"
+          - "--exclude=ansible"
+          - "--exclude=.env"
+        owner: no
+        group: no
+
+    - name: Fix file ownership
+      file:
+        path: "{{ app_dir }}"
+        owner: ubuntu
+        group: ubuntu
+        recurse: yes
+
+    - name: Copy production environment file
+      copy:
+        src: "{{ playbook_dir }}/../.env.prod"
+        dest: "{{ app_dir }}/.env"
+        owner: ubuntu
+        group: ubuntu
+        mode: '0600'
+
+    - name: Create virtual environment
+      command: python3 -m venv "{{ app_dir }}/venv" --upgrade-deps
+      become_user: ubuntu
+      args:
+        creates: "{{ app_dir }}/venv/bin/python"
+
+    - name: Install Python dependencies
+      command: "{{ app_dir }}/venv/bin/pip install -r {{ app_dir }}/requirements.txt"
+      become_user: ubuntu
+
+    - name: Create systemd service file
+      template:
+        src: vocab-dog.service.j2
+        dest: /etc/systemd/system/{{ service_name }}.service
+      notify: restart service
+
+    - name: Enable and start service
+      systemd:
+        name: "{{ service_name }}"
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+  handlers:
+    - name: restart service
+      systemd:
+        name: "{{ service_name }}"
+        state: restarted
+        daemon_reload: yes

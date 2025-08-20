@@ -6,3 +6,6 @@ typecheck:
 
 run:
 	python main.py
+
+deploy:
+	ansible-playbook -i ansible/inventory/production ansible/deploy.yml

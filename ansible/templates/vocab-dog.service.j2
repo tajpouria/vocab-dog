@@ -1,0 +1,16 @@
+[Unit]
+Description=Vocab Dog Telegram Bot
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory={{ app_dir }}
+Environment=PATH={{ app_dir }}/venv/bin
+ExecStart={{ app_dir }}/venv/bin/python {{ app_dir }}/main.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
