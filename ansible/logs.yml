@@ -1,0 +1,33 @@
+---
+- name: Show Vocab Dog Bot Logs
+  hosts: production
+  vars:
+    service_name: vocab-dog
+    
+  tasks:
+    - name: Show systemd service status
+      command: systemctl status {{ service_name }}
+      register: service_status
+      ignore_errors: yes
+
+    - name: Display service status
+      debug:
+        msg: "{{ service_status.stdout_lines }}"
+
+    - name: Show recent service logs (last 50 lines)
+      command: journalctl -u {{ service_name }} -n 50 --no-pager
+      register: service_logs
+      ignore_errors: yes
+
+    - name: Display recent logs
+      debug:
+        msg: "{{ service_logs.stdout_lines }}"
+
+    - name: Show service logs from today
+      command: journalctl -u {{ service_name }} --since today --no-pager
+      register: today_logs
+      ignore_errors: yes
+
+    - name: Display today's logs
+      debug:
+        msg: "{{ today_logs.stdout_lines }}"
