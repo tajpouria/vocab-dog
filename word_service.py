@@ -3,6 +3,9 @@ from google import genai
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
 from jinja2 import Template
+from shared import get_logger
+
+logger = get_logger(__name__)
 
 client = genai.Client()
 model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
@@ -140,6 +143,7 @@ async def generate_enhanced_word_definition(
     Returns:
         Dict containing both formatted message and raw data
     """
+    logger.info(f"Generating definition for word: '{word}' ({source_language} -> {target_language})")
 
     prompt = f"""
     You are a friendly language teacher helping a {user_level} learner understand the word "{word}" in {source_language}.
@@ -172,6 +176,7 @@ async def generate_enhanced_word_definition(
     """
 
     try:
+        logger.debug(f"Calling Gemini API with model: {model}")
         response = client.models.generate_content(
             model=model,
             contents=prompt,
@@ -185,6 +190,7 @@ async def generate_enhanced_word_definition(
         if not response.parsed:
             raise ValueError("No parsed response received from Gemini API")
 
+        definition = response.parsed
         if not isinstance(definition, EnhancedWordDefinition):
             raise ValueError("Invalid response format from Gemini API")
 
@@ -205,6 +211,7 @@ async def generate_enhanced_word_definition(
             memory_tip=definition.memory_tip,
         ).strip()
 
+        logger.info(f"Successfully generated definition for '{word}' with {len(definition.examples)} examples and {len(definition.synonyms)} synonyms")
         return {
             "success": True,
             "formatted_message": formatted_message,
@@ -217,6 +224,7 @@ async def generate_enhanced_word_definition(
         }
 
     except Exception as e:
+        logger.error(f"Failed to generate definition for '{word}': {str(e)}")
         error_message = (
             f"Sorry, I couldn't generate a definition for '{word}'. Please try again."
         )
@@ -235,6 +243,7 @@ async def generate_word_definition(
     Backward compatibility wrapper for the enhanced function.
     Returns only the formatted message string as before.
     """
+    logger.debug(f"Wrapper function called for word: '{word}'")
     result = await generate_enhanced_word_definition(
         word, source_language, target_language
     )

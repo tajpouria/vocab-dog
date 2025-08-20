@@ -1,21 +1,16 @@
 import os
 import sys
 import signal
-import logging
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 
 load_dotenv()
 
+from shared import get_logger
 from word_service import generate_word_definition
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)],
-)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
