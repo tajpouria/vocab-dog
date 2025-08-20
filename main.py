@@ -8,7 +8,7 @@ from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filte
 load_dotenv()
 
 from shared import get_logger
-from word_service import generate_word_definition
+from word_service import generate_enhanced_word_definition
 
 logger = get_logger(__name__)
 
@@ -45,9 +45,39 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             chat_id=update.effective_chat.id, action="typing"
         )
 
-    definition = await generate_word_definition(word, source_language, target_language)
+    result = await generate_enhanced_word_definition(word, source_language, target_language)
 
-    await update.message.reply_text(definition, parse_mode="HTML")
+    if result["success"]:
+        # Send text definition with pronunciation audio attached
+        if result.get("audio_path"):
+            try:
+                with open(result["audio_path"], "rb") as audio_file:
+                    # Send the audio as a voice message first (without caption)
+                    await update.message.reply_voice(
+                        voice=audio_file,
+                        caption=f"Dutch pronunciation of '{word}'"
+                    )
+                    
+                    # Then send the full definition as a separate text message
+                    await update.message.reply_text(
+                        result["formatted_message"],
+                        parse_mode="HTML"
+                    )
+                # Clean up the temporary audio file
+                os.unlink(result["audio_path"])
+                logger.info(f"Sent pronunciation audio for '{word}' and cleaned up file")
+            except Exception as e:
+                logger.error(f"Failed to send pronunciation audio for '{word}': {str(e)}")
+                # Clean up the temporary file even if sending failed
+                if os.path.exists(result["audio_path"]):
+                    os.unlink(result["audio_path"])
+                # Fallback to text only
+                await update.message.reply_text(result["formatted_message"], parse_mode="HTML")
+        else:
+            # No audio available, send text only
+            await update.message.reply_text(result["formatted_message"], parse_mode="HTML")
+    else:
+        await update.message.reply_text(result["formatted_message"])
 
 
 app = ApplicationBuilder().token(telegram_token).build()

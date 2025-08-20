@@ -2,8 +2,46 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
 from jinja2 import Template
 from shared import get_logger, genai_client, genai_model
+import asyncio
+import aiofiles
+import tempfile
+import os
+from gpytranslate import Translator
 
 logger = get_logger(__name__)
+
+
+async def generate_pronunciation_audio(word: str) -> Optional[str]:
+    """
+    Generate pronunciation audio for a word using gpytranslate TTS.
+    Always uses Dutch (nl) as the source language.
+    
+    Args:
+        word: The word to pronounce in Dutch
+    
+    Returns:
+        Path to the generated audio file, or None if failed
+    """
+    try:
+        logger.info(f"Generating Dutch pronunciation audio for '{word}'")
+        
+        # Create a temporary file for the audio
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp3')
+        temp_path = temp_file.name
+        temp_file.close()
+        
+        # Initialize translator and generate TTS in Dutch
+        translator = Translator()
+        async with aiofiles.open(temp_path, "wb") as file:
+            # Use 'nl' as the language code for Dutch pronunciation
+            await translator.tts(word, file=file, lang='nl')
+        
+        logger.info(f"Successfully generated pronunciation audio: {temp_path}")
+        return temp_path
+        
+    except Exception as e:
+        logger.error(f"Failed to generate pronunciation audio for '{word}': {str(e)}")
+        return None
 
 
 MESSAGE_TEMPLATE = Template(
@@ -47,6 +85,23 @@ MESSAGE_TEMPLATE = Template(
 {% endif -%}
 {% if memory_tip -%}
 <b>💡 Tip:</b> <i>{{ memory_tip }}</i>
+{% endif -%}
+"""
+)
+
+# Shorter template for voice message captions (Telegram limit: 1024 chars)
+VOICE_CAPTION_TEMPLATE = Template(
+    """
+<b>{{ word_header }}</b> <em>[{{ part_of_speech }}]</em>
+<u>{{ translation }}</u>
+
+<em>{{ definition_simple }}</em>
+
+{% if synonyms and synonyms|length > 0 -%}
+<b>Synonyms:</b> {% for synonym in synonyms[:2] -%}<em>{{ synonym.word }}</em>{% if not loop.last %}, {% endif %}{% endfor %}
+{% endif -%}
+{% if examples and examples|length > 0 -%}
+<b>Example:</b> <i>"{{ examples[0].example }}"</i>
 {% endif -%}
 """
 )
@@ -160,6 +215,9 @@ async def generate_enhanced_word_definition(
         if not isinstance(definition, EnhancedWordDefinition):
             raise ValueError("Invalid response format from Gemini API")
 
+        # Generate pronunciation audio (always in Dutch)
+        audio_path = await generate_pronunciation_audio(definition.word)
+        
         formatted_message = MESSAGE_TEMPLATE.render(
             word_header=f"{definition.word}",
             pronunciation=definition.pronunciation,
@@ -175,15 +233,27 @@ async def generate_enhanced_word_definition(
             memory_tip=definition.memory_tip,
         ).strip()
 
+        # Create shorter caption for voice message
+        voice_caption = VOICE_CAPTION_TEMPLATE.render(
+            word_header=f"{definition.word}",
+            part_of_speech=definition.part_of_speech,
+            translation=definition.translation,
+            definition_simple=definition.definition_simple,
+            synonyms=definition.synonyms,
+            examples=definition.examples,
+        ).strip()
+
         logger.info(f"Successfully generated definition for '{word}' with {len(definition.examples)} examples and {len(definition.synonyms)} synonyms")
         return {
             "success": True,
             "formatted_message": formatted_message,
+            "voice_caption": voice_caption,
             "raw_data": definition.model_dump(),
             "word": definition.word,
             "translation": definition.translation,
             "examples_count": len(definition.examples),
             "synonyms_count": len(definition.synonyms),
+            "audio_path": audio_path,
         }
 
     except Exception as e:
