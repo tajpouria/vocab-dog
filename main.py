@@ -22,19 +22,19 @@ MESSAGE_TEMPLATE = Template("""
 <em>{{ definition_simple }}</em>
 
 {% if synonyms %}<b>Synonyms:</b>
-{% for synonym in synonyms %}- <em>{{ synonym.word }}</em> - <u>{{ synonym.translation }}</u>{% if not loop.last %}, {% endif %}
+{% for synonym in synonyms %}- <em>{{ synonym.word }}</em> <u>({{ synonym.translation }})</u>{% if not loop.last %}, {% endif %}
 {% endfor %}{% endif %}
 {% if antonyms %}<b>Antonyms:</b>
-{% for antonym in antonyms %}- <em>{{ antonym.word }}</em> - <u>{{ antonym.translation }}</u>{% if not loop.last %}, {% endif %}
+{% for antonym in antonyms %}- <em>{{ antonym.word }}</em> <u>{({ antonym.translation }})</u>{% if not loop.last %}, {% endif %}
 {% endfor %}{% endif %}
 {% if examples %}<b>Examples:</b>
 {% for example in examples %}- <i>"{{ example.example }}"</i>
-   <em>{{ example.translation }}</em>
+   <u>{{ example.translation }}</u>
 {% endfor %}{% endif %}
 {% if collocations %}<b>Collocations:</b>
 {% for collocation in collocations %}- {{ collocation.phrase }} <u>({{ collocation.meaning }})</u>
 {% endfor %}{% endif %}
-{% if memory_tip %}<b>💡 Tip:</b> <i>{{ memory_tip }}</i>{% endif %}
+{% if memory_tip %}<b>Tip:</b> <i>{{ memory_tip }}</i>{% endif %}
 """)
 
 
