@@ -1,0 +1,9 @@
+.venv
+.env*
+ansible/inventory
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
