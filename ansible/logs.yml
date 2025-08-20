@@ -22,12 +22,3 @@
     - name: Display recent logs
       debug:
         msg: "{{ service_logs.stdout_lines }}"
-
-    - name: Show service logs from today
-      command: journalctl -u {{ service_name }} --since today --no-pager
-      register: today_logs
-      ignore_errors: yes
-
-    - name: Display today's logs
-      debug:
-        msg: "{{ today_logs.stdout_lines }}"
