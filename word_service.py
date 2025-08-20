@@ -47,10 +47,6 @@ MESSAGE_TEMPLATE = Template(
 <b>Antonyms:</b> {{ antonyms | join(', ') }}
 
 {% endif -%}
-{% if difficulty_level -%}
-<b>Proficiency Level:</b> {{ difficulty_level }}
-
-{% endif -%}
 {% if examples -%}
 <b>Examples in Context:</b>
 {% for example in examples -%}
@@ -111,9 +107,6 @@ class EnhancedWordDefinition(BaseModel):
     )
     usage_tip: Optional[str] = Field(
         default=None, description="Practical tip on how to use this word"
-    )
-    difficulty_level: Optional[str] = Field(
-        default=None, description="Difficulty level (Beginner, Intermediate, Advanced)"
     )
     synonyms: List[str] = Field(default=[], description="List of synonyms")
     antonyms: List[str] = Field(default=[], description="List of antonyms")
@@ -203,7 +196,6 @@ async def generate_enhanced_word_definition(
             definition_simple=definition.definition_simple,
             definition_detailed=definition.definition_detailed,
             usage_tip=definition.usage_tip,
-            difficulty_level=definition.difficulty_level,
             synonyms=definition.synonyms,
             antonyms=definition.antonyms,
             examples=definition.examples,
@@ -218,7 +210,6 @@ async def generate_enhanced_word_definition(
             "raw_data": definition.model_dump(),
             "word": definition.word,
             "translation": definition.translation,
-            "difficulty": definition.difficulty_level,
             "examples_count": len(definition.examples),
             "synonyms_count": len(definition.synonyms),
         }
