@@ -1,100 +1,70 @@
-import os
-from google import genai
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
 from jinja2 import Template
-from shared import get_logger
+from shared import get_logger, genai_client, genai_model
 
 logger = get_logger(__name__)
 
-client = genai.Client()
-model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 MESSAGE_TEMPLATE = Template(
     """
-<b>{{ word_header }}</b>
-
+<b>{{ word_header }}</b>{% if word_forms %} <i>({{ word_forms }})</i>{% endif %} <em>[{{ part_of_speech }}]</em>
 {% if pronunciation -%}
-<b>Pronunciation:</b> {{ pronunciation }}
+<b><i>{{ pronunciation }}</i></b>
+{% endif %}
+<u>{{ translation }}</u>
 
-{% endif -%}
-{% if word_forms -%}
-<b>Word Forms:</b> {{ word_forms }}
+<em>{{ definition_simple }}</em>
 
-{% endif -%}
-<b>Part of Speech:</b> {{ part_of_speech }}
-
-<b>Translation:</b> <i>{{ translation }}</i>
-
-<b>Definition:</b>
-{{ definition_simple }}
-
-{% if definition_detailed -%}
-<b>Extended Definition:</b>
-{{ definition_detailed }}
-
-{% endif -%}
-{% if usage_tip -%}
-<b>Usage Guidelines:</b>
-{{ usage_tip }}
-
-{% endif -%}
 {% if synonyms -%}
-<b>Synonyms:</b> 
-{% for synonym in synonyms -%}
-• {{ synonym }}{% if not loop.last %}, {% endif %}
-{% endfor %}
+<b>Synonyms:</b>
 
+{% for synonym in synonyms -%}
+- <em>{{ synonym.word }}</em> - <u>{{ synonym.translation }}</u>{% if not loop.last %}, {% endif %}
+{% endfor %}
 {% endif -%}
 {% if antonyms -%}
-<b>Antonyms:</b> 
-{% for antonym in antonyms -%}
-• {{ antonym }}{% if not loop.last %}, {% endif %}
-{% endfor %}
+<b>Antonyms:</b>
 
+{% for antonym in antonyms -%}
+- <em>{{ antonym.word }}</em> - <u>{{ antonym.translation }}</u>{% if not loop.last %}, {% endif %}
+{% endfor %}
 {% endif -%}
 {% if examples -%}
-<b>Examples in Context:</b>
+<b>Examples:</b>
 
 {% for example in examples -%}
-<b>{{ loop.index }}. {{ example.context }}:</b>
-"{{ example.example }}"
-<i>Translation:</i> {{ example.translation }}
-{% if example.explanation -%}
-<i>Note:</i> {{ example.explanation }}
-{% endif %}
-
+- <i>"{{ example.example }}"</i>
+   <em>{{ example.translation }}</em>
 {% endfor -%}
-{% endif -%}
+{% endif %}
 {% if collocations -%}
-<b>Common Collocations:</b>
+<b>Collocations:</b>
 
 {% for collocation in collocations -%}
-• <b>{{ collocation.phrase }}</b> - <i>{{ collocation.meaning }}</i>
+- {{ collocation.phrase }} <u>({{ collocation.meaning }})</u>
 {% endfor %}
-
 {% endif -%}
 {% if memory_tip -%}
-<b>Learning Aid:</b> {{ memory_tip }}
+<b>💡 Tip:</b> <i>{{ memory_tip }}</i>
 {% endif -%}
 """
 )
 
 
 class WordExample(BaseModel):
-    context: str = Field(
-        description="Context where this example is from (e.g., 'Daily conversation', 'News', 'Literature')"
-    )
     example: str = Field(description="The example sentence using the word")
     translation: str = Field(description="Translation of the example")
-    explanation: Optional[str] = Field(
-        default=None, description="Brief explanation of why this example is useful"
-    )
 
 
 class Collocation(BaseModel):
     phrase: str = Field(description="Common phrase or collocation with the word")
     meaning: str = Field(description="Meaning of the collocation")
+
+
+class SynonymAntonym(BaseModel):
+    word: str = Field(description="The synonym or antonym word")
+    translation: str = Field(description="Translation of the synonym or antonym")
 
 
 class EnhancedWordDefinition(BaseModel):
@@ -111,14 +81,9 @@ class EnhancedWordDefinition(BaseModel):
     )
     translation: str = Field(description="Direct translation to target language")
     definition_simple: str = Field(description="Simple, beginner-friendly definition")
-    definition_detailed: Optional[str] = Field(
-        default=None, description="More detailed explanation for advanced learners"
-    )
-    usage_tip: Optional[str] = Field(
-        default=None, description="Practical tip on how to use this word"
-    )
-    synonyms: List[str] = Field(default=[], description="List of synonyms")
-    antonyms: List[str] = Field(default=[], description="List of antonyms")
+
+    synonyms: List[SynonymAntonym] = Field(default=[], description="List of synonyms with translations")
+    antonyms: List[SynonymAntonym] = Field(default=[], description="List of antonyms with translations")
     examples: List[WordExample] = Field(
         default=[], description="List of practical examples"
     )
@@ -158,11 +123,10 @@ async def generate_enhanced_word_definition(
     4. Part of speech clearly explained
     5. Direct translation to {target_language}
     6. Simple definition that a {user_level} can understand
-    7. More detailed definition for deeper understanding (optional)
-    8. Practical usage tip explaining when/how to use this word
+
     9. Difficulty level assessment
-    10. 3-5 synonyms (simpler alternatives for beginners)
-    11. 2-3 antonyms if applicable
+    10. 3-5 synonyms (simpler alternatives for beginners) with their translations
+    11. 2-3 antonyms if applicable with their translations
     12. 5 realistic examples from different contexts:
         - Daily conversation
         - Social media/texting
@@ -178,9 +142,9 @@ async def generate_enhanced_word_definition(
     """
 
     try:
-        logger.debug(f"Calling Gemini API with model: {model}")
-        response = client.models.generate_content(
-            model=model,
+        logger.debug(f"Calling Gemini API with model: {genai_model}")
+        response = genai_client.models.generate_content(
+            model=genai_model,
             contents=prompt,
             config={
                 "response_mime_type": "application/json",
@@ -203,8 +167,7 @@ async def generate_enhanced_word_definition(
             part_of_speech=definition.part_of_speech,
             translation=definition.translation,
             definition_simple=definition.definition_simple,
-            definition_detailed=definition.definition_detailed,
-            usage_tip=definition.usage_tip,
+
             synonyms=definition.synonyms,
             antonyms=definition.antonyms,
             examples=definition.examples,

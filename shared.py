@@ -1,5 +1,7 @@
+import os
 import logging
 import sys
+from google import genai
 
 def get_logger(name: str) -> logging.Logger:
     logging.basicConfig(
@@ -9,3 +11,7 @@ def get_logger(name: str) -> logging.Logger:
     )
     logger: logging.Logger = logging.getLogger(name)
     return logger
+
+
+genai_client = genai.Client()
+genai_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
