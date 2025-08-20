@@ -4,13 +4,38 @@ import signal
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
+from jinja2 import Template
 
 load_dotenv()
 
 from shared import get_logger
-from word_service import generate_enhanced_word_definition
+from word_service import get_word_definition, generate_word_audio
 
 logger = get_logger(__name__)
+
+# Message formatting template
+MESSAGE_TEMPLATE = Template("""
+<b>{{ word }}</b>{% if word_forms %} <i>({{ word_forms }})</i>{% endif %} <em>[{{ part_of_speech }}]</em>
+{% if pronunciation %}<b><i>{{ pronunciation }}</i></b>{% endif %}
+<u>{{ translation }}</u>
+
+<em>{{ definition_simple }}</em>
+
+{% if synonyms %}<b>Synonyms:</b>
+{% for synonym in synonyms %}- <em>{{ synonym.word }}</em> - <u>{{ synonym.translation }}</u>{% if not loop.last %}, {% endif %}
+{% endfor %}{% endif %}
+{% if antonyms %}<b>Antonyms:</b>
+{% for antonym in antonyms %}- <em>{{ antonym.word }}</em> - <u>{{ antonym.translation }}</u>{% if not loop.last %}, {% endif %}
+{% endfor %}{% endif %}
+{% if examples %}<b>Examples:</b>
+{% for example in examples %}- <i>"{{ example.example }}"</i>
+   <em>{{ example.translation }}</em>
+{% endfor %}{% endif %}
+{% if collocations %}<b>Collocations:</b>
+{% for collocation in collocations %}- {{ collocation.phrase }} <u>({{ collocation.meaning }})</u>
+{% endfor %}{% endif %}
+{% if memory_tip %}<b>💡 Tip:</b> <i>{{ memory_tip }}</i>{% endif %}
+""")
 
 
 telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -27,71 +52,59 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not update.message or not update.message.text:
         return
 
-    message_text = update.message.text.strip()
-    logger.info(f"Received message: {message_text}")
-
-    word = message_text
+    word = update.message.text.strip()
+    logger.info(f"Received message: {word}")
 
     if not word or len(word.split()) != 1:
         await update.message.reply_text(
-            f"Please send a single word to get its definition.\n"
-            f"I'll translate from {source_language} to {target_language}.\n"
-            f"Example: pull"
+            f"Please send a single word. I'll translate from {source_language} to {target_language}."
         )
         return
 
-    if update.effective_chat and update.effective_chat.id:
-        await context.bot.send_chat_action(
-            chat_id=update.effective_chat.id, action="typing"
-        )
+    if update.effective_chat:
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
 
-    result = await generate_enhanced_word_definition(word, source_language, target_language)
-
-    if result["success"]:
-        # Send text definition with pronunciation audio attached
-        if result.get("audio_path"):
+    try:
+        definition = await get_word_definition(word, source_language, target_language)
+        audio_path = await generate_word_audio(word)
+        
+        message = MESSAGE_TEMPLATE.render(**definition.model_dump()).strip()
+        
+        if audio_path:
             try:
-                with open(result["audio_path"], "rb") as audio_file:
-                    # Send the audio as a voice message first (without caption)
+                with open(audio_path, "rb") as audio_file:
                     await update.message.reply_voice(
                         voice=audio_file,
                         caption=f"Dutch pronunciation of '{word}'"
                     )
-                    
-                    # Then send the full definition as a separate text message
-                    await update.message.reply_text(
-                        result["formatted_message"],
-                        parse_mode="HTML"
-                    )
-                # Clean up the temporary audio file
-                os.unlink(result["audio_path"])
-                logger.info(f"Sent pronunciation audio for '{word}' and cleaned up file")
+                await update.message.reply_text(message, parse_mode="HTML")
+                os.unlink(audio_path)
             except Exception as e:
-                logger.error(f"Failed to send pronunciation audio for '{word}': {str(e)}")
-                # Clean up the temporary file even if sending failed
-                if os.path.exists(result["audio_path"]):
-                    os.unlink(result["audio_path"])
-                # Fallback to text only
-                await update.message.reply_text(result["formatted_message"], parse_mode="HTML")
+                logger.error(f"Audio send failed: {e}")
+                if os.path.exists(audio_path):
+                    os.unlink(audio_path)
+                await update.message.reply_text(message, parse_mode="HTML")
         else:
-            # No audio available, send text only
-            await update.message.reply_text(result["formatted_message"], parse_mode="HTML")
-    else:
-        await update.message.reply_text(result["formatted_message"])
+            await update.message.reply_text(message, parse_mode="HTML")
+            
+    except Exception as e:
+        logger.error(f"Definition failed for '{word}': {e}")
+        await update.message.reply_text(f"Sorry, couldn't define '{word}'. Try again.")
 
 
-app = ApplicationBuilder().token(telegram_token).build()
+def main():
+    app = ApplicationBuilder().token(telegram_token).build()
+    app.add_handler(MessageHandler(filters.TEXT, handle_message))
+    
+    def signal_handler(signum, frame):
+        logger.info("Shutting down...")
+        app.stop()
+        sys.exit(0)
+    
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
+    app.run_polling(drop_pending_updates=True)
 
-app.add_handler(MessageHandler(filters.TEXT, handle_message))
-
-
-def signal_handler(signum, frame):
-    logger.info("Shutting down gracefully...")
-    app.stop()
-    sys.exit(0)
-
-
-signal.signal(signal.SIGINT, signal_handler)
-signal.signal(signal.SIGTERM, signal_handler)
-
-app.run_polling(drop_pending_updates=True)
+if __name__ == "__main__":
+    main()
