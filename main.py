@@ -25,7 +25,7 @@ MESSAGE_TEMPLATE = Template("""
 {% for synonym in synonyms %}- <em>{{ synonym.word }}</em> <u>({{ synonym.translation }})</u>{% if not loop.last %}, {% endif %}
 {% endfor %}{% endif %}
 {% if antonyms %}<b>Antonyms:</b>
-{% for antonym in antonyms %}- <em>{{ antonym.word }}</em> <u>{({ antonym.translation }})</u>{% if not loop.last %}, {% endif %}
+{% for antonym in antonyms %}- <em>{{ antonym.word }}</em> <u>{({{ antonym.translation }})</u>{% if not loop.last %}, {% endif %}
 {% endfor %}{% endif %}
 {% if examples %}<b>Examples:</b>
 {% for example in examples %}- <i>"{{ example.example }}"</i>
