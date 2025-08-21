@@ -51,6 +51,23 @@ class WordDefinition(BaseModel):
     )
 
 
+class WordTranslation(BaseModel):
+    word: str = Field(description="The original word")
+    translation: str = Field(description="Translation of the word")
+
+
+class ProgressiveBreakdown(BaseModel):
+    fragment: str = Field(description="The progressive fragment of the sentence")
+    translation: str = Field(description="Translation of this fragment")
+
+
+class SentenceBreakdown(BaseModel):
+    original_text: str = Field(description="The original sentence or paragraph")
+    full_translation: str = Field(description="Complete translation of the text")
+    word_by_word: List[WordTranslation] = Field(description="Word-by-word breakdown with translations")
+    progressive_breakdown: List[ProgressiveBreakdown] = Field(description="Progressive sentence building breakdown")
+
+
 async def generate_word_audio(text: str) -> Optional[str]:
     try:
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp3')
@@ -103,6 +120,37 @@ async def get_word_definition(word: str, source_language: str, target_language: 
         config={
             "response_mime_type": "application/json",
             "response_schema": WordDefinition,
+            "temperature": 0.1,
+        },
+    )
+    
+    if not response.parsed:
+        raise ValueError("No response from API")
+    
+    return response.parsed
+
+
+async def get_sentence_breakdown(text: str, source_language: str, target_language: str) -> SentenceBreakdown:
+    prompt = f"""
+    You are a language teacher helping a student understand this {source_language} text: "{text}"
+    
+    Provide:
+    1. The original text exactly as provided
+    2. A complete, natural translation to {target_language}
+    3. Word-by-word breakdown with individual translations (exclude punctuation, include only meaningful words)
+    4. Progressive breakdown showing how the sentence builds up piece by piece, starting with the first meaningful fragment and adding more words/phrases progressively until the complete sentence is formed
+    
+    For the progressive breakdown, show how each fragment grows and how the meaning develops. Start with the smallest meaningful unit and build up logically.
+    
+    Keep translations simple and contextually appropriate.
+    """
+
+    response = genai_client.models.generate_content(
+        model=genai_model,
+        contents=prompt,
+        config={
+            "response_mime_type": "application/json",
+            "response_schema": SentenceBreakdown,
             "temperature": 0.1,
         },
     )

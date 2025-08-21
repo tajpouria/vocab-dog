@@ -9,7 +9,7 @@ from jinja2 import Template
 load_dotenv()
 
 from shared import get_logger
-from word_service import get_word_definition, generate_word_audio
+from word_service import get_word_definition, generate_word_audio, get_sentence_breakdown
 
 logger = get_logger(__name__)
 
@@ -37,6 +37,20 @@ MESSAGE_TEMPLATE = Template("""
 {% if memory_tip %}<b>Tip:</b> <i>{{ memory_tip }}</i>{% endif %}
 """)
 
+# Sentence formatting template
+SENTENCE_TEMPLATE = Template("""
+<b>{{ original_text }}</b>
+
+<u>{{ full_translation }}</u>
+
+{% for breakdown in progressive_breakdown %}"{{ breakdown.fragment }}"
+<u>{{ breakdown.translation }}</u>
+
+{% endfor %}
+{% for word_trans in word_by_word %}<em>{{ word_trans.word }}</em> (<u>{{ word_trans.translation }}</u>)
+{% endfor %}
+""")
+
 
 telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
 gemini_api_key = os.getenv("GEMINI_API_KEY")
@@ -52,44 +66,67 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not update.message or not update.message.text:
         return
 
-    word = update.message.text.strip()
-    logger.info(f"Received message: {word}")
+    text = update.message.text.strip()
+    logger.info(f"Received message: {text}")
 
-    if not word or len(word.split()) != 1:
-        await update.message.reply_text(
-            f"Please send a single word. I'll translate from {source_language} to {target_language}."
-        )
+    if not text:
         return
 
     if update.effective_chat:
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
 
     try:
-        definition = await get_word_definition(word, source_language, target_language)
-        audio_path = await generate_word_audio(word)
-        
-        message = MESSAGE_TEMPLATE.render(**definition.model_dump()).strip()
-        
-        if audio_path:
-            try:
-                with open(audio_path, "rb") as audio_file:
-                    await update.message.reply_voice(
-                        voice=audio_file,
-                        caption=f"Dutch pronunciation of '{word}'"
-                    )
-                await update.message.reply_text(message, parse_mode="HTML")
-                os.unlink(audio_path)
-            except Exception as e:
-                logger.error(f"Audio send failed: {e}")
-                if os.path.exists(audio_path):
+        # Check if it's a single word or sentence/paragraph
+        if len(text.split()) == 1:
+            # Single word - use existing word definition logic
+            definition = await get_word_definition(text, source_language, target_language)
+            audio_path = await generate_word_audio(text)
+            
+            message = MESSAGE_TEMPLATE.render(**definition.model_dump()).strip()
+            
+            if audio_path:
+                try:
+                    with open(audio_path, "rb") as audio_file:
+                        await update.message.reply_voice(
+                            voice=audio_file,
+                            caption=f"{source_language.title()} pronunciation of '{text}'"
+                        )
+                    await update.message.reply_text(message, parse_mode="HTML")
                     os.unlink(audio_path)
+                except Exception as e:
+                    logger.error(f"Audio send failed: {e}")
+                    if os.path.exists(audio_path):
+                        os.unlink(audio_path)
+                    await update.message.reply_text(message, parse_mode="HTML")
+            else:
                 await update.message.reply_text(message, parse_mode="HTML")
         else:
-            await update.message.reply_text(message, parse_mode="HTML")
+            # Sentence/paragraph - use sentence breakdown logic
+            breakdown = await get_sentence_breakdown(text, source_language, target_language)
+            audio_path = await generate_word_audio(text)
+            
+            message = SENTENCE_TEMPLATE.render(**breakdown.model_dump()).strip()
+            
+            if audio_path:
+                try:
+                    with open(audio_path, "rb") as audio_file:
+                        await update.message.reply_voice(
+                            voice=audio_file,
+                            caption=f"{source_language.title()} pronunciation"
+                        )
+                    await update.message.reply_text(message, parse_mode="HTML")
+                    os.unlink(audio_path)
+                except Exception as e:
+                    logger.error(f"Audio send failed: {e}")
+                    if os.path.exists(audio_path):
+                        os.unlink(audio_path)
+                    await update.message.reply_text(message, parse_mode="HTML")
+            else:
+                await update.message.reply_text(message, parse_mode="HTML")
             
     except Exception as e:
-        logger.error(f"Definition failed for '{word}': {e}")
-        await update.message.reply_text(f"Sorry, couldn't define '{word}'. Try again.")
+        logger.error(f"Processing failed for '{text}': {e}")
+        await update.message.reply_text(f"Sorry, couldn't process '{text}'. Try again.")
 
 
 def main():
