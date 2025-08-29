@@ -46,6 +46,7 @@ class FragmentBreakdown(BaseModel):
 
 class SentenceBreakdown(BaseModel):
     original_text: str = Field(description="The original sentence or paragraph")
+    full_translation: str = Field(description="Complete translation of the text")
     word_by_word: List[WordTranslation] = Field(
         description="Word-by-word breakdown with translations"
     )
@@ -112,6 +113,7 @@ async def get_sentence_breakdown(
     You are a language teacher helping a student understand this {source_language} text: "{text}"
     
     The original text exactly as provided
+    A complete, natural translation to {target_language}
     Word-by-word breakdown with individual translations (exclude punctuation, include only meaningful words)
     A breakdown of the sentence into meaningful fragments, with a translation for each fragment.
     The fragments should be sequential and cover the entire sentence.
