@@ -19,7 +19,7 @@ MESSAGE_TEMPLATE = Template("""
 {% if pronunciation %}<b><i>{{ pronunciation }}</i></b>{% endif %}
 <u>{{ translation }}</u>
 
-<em>{{ definition_simple }}</em>
+{{ definition_simple }}
 
 {% if examples %}
 {% for example in examples %}- <i>"{{ example.example }}"</i>
@@ -35,13 +35,10 @@ MESSAGE_TEMPLATE = Template("""
 SENTENCE_TEMPLATE = Template("""
 <b>{{ original_text }}</b>
 
-<u>{{ full_translation }}</u>
-
-{% for breakdown in progressive_breakdown %}"{{ breakdown.fragment }}"
-<u>{{ breakdown.translation }}</u>
-
+{% for word_trans in word_by_word %}<em>{{ word_trans.word }}</em> <u>{{ word_trans.translation }}</u>
 {% endfor %}
-{% for word_trans in word_by_word %}<em>{{ word_trans.word }}</em> (<u>{{ word_trans.translation }}</u>)
+
+{% for breakdown in fragment_breakdown %}"{{ breakdown.fragment }}" <u>{{ breakdown.translation }}</u>
 {% endfor %}
 """)
 

@@ -39,19 +39,18 @@ class WordTranslation(BaseModel):
     translation: str = Field(description="Translation of the word")
 
 
-class ProgressiveBreakdown(BaseModel):
-    fragment: str = Field(description="The progressive fragment of the sentence")
+class FragmentBreakdown(BaseModel):
+    fragment: str = Field(description="A meaningful fragment of the sentence")
     translation: str = Field(description="Translation of this fragment")
 
 
 class SentenceBreakdown(BaseModel):
     original_text: str = Field(description="The original sentence or paragraph")
-    full_translation: str = Field(description="Complete translation of the text")
     word_by_word: List[WordTranslation] = Field(
         description="Word-by-word breakdown with translations"
     )
-    progressive_breakdown: List[ProgressiveBreakdown] = Field(
-        description="Progressive sentence building breakdown"
+    fragment_breakdown: List[FragmentBreakdown] = Field(
+        description="Sentence broken down into meaningful fragments with translations"
     )
 
 
@@ -112,15 +111,10 @@ async def get_sentence_breakdown(
     prompt = f"""
     You are a language teacher helping a student understand this {source_language} text: "{text}"
     
-    Provide:
-    1. The original text exactly as provided
-    2. A complete, natural translation to {target_language}
-    3. Word-by-word breakdown with individual translations (exclude punctuation, include only meaningful words)
-    4. Progressive breakdown showing how the sentence builds up piece by piece, starting with the first meaningful fragment and adding more words/phrases progressively until the complete sentence is formed
-    
-    For the progressive breakdown, show how each fragment grows and how the meaning develops. Start with the smallest meaningful unit and build up logically.
-    
-    Keep translations simple and contextually appropriate.
+    The original text exactly as provided
+    Word-by-word breakdown with individual translations (exclude punctuation, include only meaningful words)
+    A breakdown of the sentence into meaningful fragments, with a translation for each fragment.
+    The fragments should be sequential and cover the entire sentence.
     """
 
     response = genai_client.models.generate_content(
