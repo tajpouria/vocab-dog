@@ -15,26 +15,20 @@ logger = get_logger(__name__)
 
 # Message formatting template
 MESSAGE_TEMPLATE = Template("""
-<b>{{ word }}</b>{% if word_forms %} <i>({{ word_forms }})</i>{% endif %} <em>[{{ part_of_speech }}]</em>
+<b>{{ word }}</b>{% if word_forms %} <i>({{ word_forms }})</i>{% endif %}
 {% if pronunciation %}<b><i>{{ pronunciation }}</i></b>{% endif %}
 <u>{{ translation }}</u>
 
 <em>{{ definition_simple }}</em>
 
-{% if synonyms %}<b>Synonyms:</b>
-{% for synonym in synonyms %}- <em>{{ synonym.word }}</em> <u>({{ synonym.translation }})</u>{% if not loop.last %}, {% endif %}
-{% endfor %}{% endif %}
-{% if antonyms %}<b>Antonyms:</b>
-{% for antonym in antonyms %}- <em>{{ antonym.word }}</em> <u>{({{ antonym.translation }})</u>{% if not loop.last %}, {% endif %}
-{% endfor %}{% endif %}
-{% if examples %}<b>Examples:</b>
+{% if examples %}
 {% for example in examples %}- <i>"{{ example.example }}"</i>
    <u>{{ example.translation }}</u>
 {% endfor %}{% endif %}
-{% if collocations %}<b>Collocations:</b>
-{% for collocation in collocations %}- {{ collocation.phrase }} <u>({{ collocation.meaning }})</u>
+
+{% if synonyms %}<b>Synonyms:</b>
+{% for synonym in synonyms %}- <em>{{ synonym.word }}</em> <u>({{ synonym.translation }})</u>{% if not loop.last %}, {% endif %}
 {% endfor %}{% endif %}
-{% if memory_tip %}<b>Tip:</b> <i>{{ memory_tip }}</i>{% endif %}
 """)
 
 # Sentence formatting template
